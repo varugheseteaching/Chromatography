@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virtual Chromatography & Diagnostic Lab</title>
+<style>
+  :root{
+    --bg:#f2f4f8; --panel:#ffffff; --ink:#1c2333; --muted:#5a6477; --line:#d8dde7;
+    --accent:#2f6fde; --accent-soft:#e7efff; --good:#1d8a4b; --bad:#c0392b; --warn:#b26b00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px}
+  header h1{font-size:22px;margin:4px 0 2px}
+  header p{margin:0 0 12px;color:var(--muted);font-size:14px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .tab{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 14px;border-radius:9px 9px 0 0;font-size:14px;font-weight:600;cursor:pointer}
+  .tab:hover{background:var(--accent-soft)}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em}
+  select,input[type=number]{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+  button{font:inherit;font-size:14px;font-weight:600;padding:8px 14px;border-radius:7px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+  button:hover{background:#f4f6fb}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{background:#2560c4}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.on{background:#fff6dc;border-color:#e2c26b}
+  .check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none}
+  .hidden{display:none !important}
+  .canvas-wrap{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  canvas{display:block;width:100%;height:auto;touch-action:none}
+  .hint{font-size:12px;color:var(--muted);margin:6px 2px 12px}
+  .grid{display:grid;grid-template-columns:1.1fr 1fr;gap:12px}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}.btns{margin-left:0}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card h2{font-size:16px;margin:0 0 8px}
+  .card h3{font-size:14px;margin:12px 0 4px}
+  .card p,.card li{font-size:14px}
+  .card ul{padding-left:18px;margin:6px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:middle}
+  th{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.03em}
+  td input[type=number]{width:80px}
+  td select{padding:5px 6px}
+  .rf{font-weight:700;font-variant-numeric:tabular-nums}
+  .ok{color:var(--good);font-weight:700}
+  .no{color:var(--bad);font-weight:700}
+  .note{font-size:13px;color:var(--muted);background:#f7f8fb;border-left:3px solid var(--line);padding:6px 10px;border-radius:4px}
+  .formula{font-family:"Cambria Math","Times New Roman",serif;font-size:16px}
+  .swatch{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:6px;border:1px solid rgba(0,0,0,.2)}
+  .line-swatch{display:inline-block;width:5px;height:14px;background:#a3184a;vertical-align:-2px;margin-right:6px;border-radius:1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Virtual Chromatography &amp; Diagnostic Lab</h1>
+    <p>Paper chromatography and lateral-flow immunoassays: two everyday uses of a mobile phase moving through a porous stationary phase by capillary action.</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-mode="lab" role="tab">Lab 1: Paper &amp; Thin Layer Chromatography</button>
+    <button class="tab" data-mode="covid" role="tab">Model 1: COVID-19 Test</button>
+    <button class="tab" data-mode="preg" role="tab">Model 2: Pregnancy Test</button>
+  </nav>
+
+  <div class="toolbar">
+    <div id="labControls" style="display:flex;gap:12px;flex-wrap:wrap">
+      <div class="field">
+        <label for="selTech">Technique</label>
+        <select id="selTech">
+          <option value="paper">Paper Chromatography</option>
+          <option value="tlc">Thin Layer Chromatography (TLC)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="selSolvent">Mobile Phase</label>
+        <select id="selSolvent"></select>
+      </div>
+      <div class="field">
+        <label for="selMix">Sample Mixture</label>
+        <select id="selMix"></select>
+      </div>
+    </div>
+    <div id="dxControls" class="hidden" style="display:flex;gap:12px;flex-wrap:wrap">
+      <div class="field">
+        <label for="selPatient">Patient Sample</label>
+        <select id="selPatient">
+          <option value="A">Person A [Positive]</option>
+          <option value="B">Person B [Negative]</option>
+          <option value="C">Person C [Invalid / Low Load]</option>
+        </select>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="chkKey"> Show answer key (teacher)</label>
+    <div class="btns">
+      <button id="btnRun" class="primary">&#9654; Run Simulation</button>
+      <button id="btnReset">&#8634; Reset</button>
+      <button id="btnRuler">&#128207; Toggle Ruler Overlay</button>
+    </div>
+  </div>
+
+  <div class="canvas-wrap"><canvas id="sim" width="960" height="560" aria-label="Simulation canvas"></canvas></div>
+  <div class="hint" id="hint">Tip: turn on the ruler, then drag it (or use the arrow keys) to line up its 0 mark with the origin line.</div>
+
+  <!-- LAB 1 INFO -->
+  <section id="labInfo" class="grid">
+    <div class="card" id="labTheory"></div>
+    <div class="card">
+      <h2 id="rfTitle">R<sub>f</sub> data table</h2>
+      <p style="margin-top:0" id="rfIntro">Measure to the <b>center</b> of each spot, starting from the origin (pencil baseline).</p>
+      <div id="rfTables"></div>
+      <h3>Discussion prompts</h3>
+      <ul id="discussList"></ul>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h2>Rank by polarity</h2>
+      <p style="margin-top:0">Using your R<sub>f</sub> values and what you know about the stationary and mobile phases, rank the substances in this sample in order of <b>increasing polarity</b>: least polar first, most polar last.</p>
+      <div id="rankSlots" style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center"></div>
+      <label for="rankWhy" style="display:block;font-size:13px;font-weight:700;color:var(--muted);margin:12px 0 4px">Justify your ranking (refer to R<sub>f</sub>, intermolecular forces, and both phases):</label>
+      <textarea id="rankWhy" rows="3" style="width:100%;font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:7px"></textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="btnRank">Check my ranking</button>
+        <span id="rankMsg" style="font-size:13px;color:var(--muted)"></span>
+      </div>
+      <div id="rankExplain" class="note hidden" style="margin-top:10px"></div>
+      <div id="compareRuns">
+      <h3>Compare runs</h3>
+      <ul>
+        <li>Run the same mixture with water/ethanol and then with hexane. The order of the R<sub>f</sub> values flips, but the polarity ranking stays the same. Use "like dissolves like" to explain why.</li>
+        <li>In which run is the mobile phase <i>more</i> polar than the stationary phase, and in which is it <i>less</i> polar? In which run does a higher R<sub>f</sub> mean a <i>more</i> polar dye?</li>
+      </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIAGNOSTIC INFO -->
+  <section id="dxInfo" class="grid hidden">
+    <div class="card">
+      <h2 id="dxTitle">How a lateral flow immunoassay works</h2>
+      <p id="dxIntro"></p>
+      <ul>
+        <li><b>Sample pad</b> takes up the liquid sample.</li>
+        <li><b>Conjugate pad</b> holds dried antibodies tagged with red <b>gold nanoparticles</b>. Any target in the sample binds to them here.</li>
+        <li><b>Nitrocellulose membrane</b> (the stationary phase) carries liquid by capillary action past two lines of immobilized antibody:
+          <ul>
+            <li><b>T line:</b> capture antibodies grab the target, which is already bound to a gold conjugate, forming a "sandwich." Gold collects there and a red line appears.</li>
+            <li><b>C line:</b> anti-IgG antibodies grab the gold conjugate whether or not target is attached. This shows the liquid flowed and the reagents work.</li>
+          </ul>
+        </li>
+        <li><b>Absorbent pad</b> acts as a wick, pulling liquid through and soaking up the excess.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Reading the result</h2>
+      <table>
+        <thead><tr><th>Window shows</th><th>Interpretation</th></tr></thead>
+        <tr><td><span class="line-swatch"></span>C &nbsp; <span class="line-swatch"></span>T</td><td>Positive (target detected)</td></tr>
+        <tr><td><span class="line-swatch"></span>C only</td><td>Negative (no target above the detection limit)</td></tr>
+        <tr><td>No C line (with or without T)</td><td>Invalid: repeat with a new test</td></tr>
+      </table>
+      <p class="note" style="margin-top:10px">Even a faint T line counts as positive. A real sample with a <i>low</i> load but good flow often shows a faint T and a strong C. Person C models a failed run: too little sample, so the liquid front stalls before reaching either line.</p>
+      <h3>Discussion prompts</h3>
+      <ul>
+        <li>How is this test a form of chromatography? Identify the mobile and stationary phases.</li>
+        <li>Why is a result with no C line invalid even if a T line appears?</li>
+        <li>Why does the window turn pink as the liquid passes, then clear?</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  // ---------- Canvas setup ----------
+  const W = 960, H = 560, PX = 32;            // PX = pixels per centimetre
+  const canvas = document.getElementById('sim');
+  const ctx = canvas.getContext('2d');
+  function setupHiDPI(){
+    const d = window.devicePixelRatio || 1;
+    canvas.width = W * d; canvas.height = H * d;
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  setupHiDPI();
+  window.addEventListener('resize', setupHiDPI);
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function rr(x, y, w, h, r){
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function text(str, x, y, opt = {}){
+    ctx.font = `${opt.weight || 400} ${opt.size || 13}px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif`;
+    ctx.fillStyle = opt.color || '#1c2333';
+    ctx.textAlign = opt.align || 'left';
+    ctx.textBaseline = opt.base || 'alphabetic';
+    ctx.fillText(str, x, y);
+  }
+
+  // ---------- Chemistry data ----------
+  // Illustrative Rf values. Keys: technique-mobilePhase.
+  //   paper-polar  = cellulose paper + water/ethanol
+  //   paper-hexane = cellulose paper + hexane
+  //   tlc-ha       = silica gel TLC + hexane:acetone 7:3
+  //   tlc-hex      = silica gel TLC + hexane only
+  // pol = polarity rank within its own sample (1 = least polar).
+  const SUBST = {
+    red:      { rgb: [215, 25, 45],  word: 'red',          pol: 1, rf: { 'paper-polar': 0.45, 'paper-hexane': 0.10, 'tlc-ha': 0.08, 'tlc-hex': 0.03 } },
+    blue:     { rgb: [25, 75, 205],  word: 'blue',         pol: 2, rf: { 'paper-polar': 0.64, 'paper-hexane': 0.06, 'tlc-ha': 0.05, 'tlc-hex': 0.02 } },
+    yellow:   { rgb: [240, 195, 0],  word: 'yellow',       pol: 3, rf: { 'paper-polar': 0.80, 'paper-hexane': 0.02, 'tlc-ha': 0.02, 'tlc-hex': 0.01 } },
+    carotene: { rgb: [245, 135, 0],  word: 'orange',       pol: 1, rf: { 'tlc-ha': 0.92, 'tlc-hex': 0.55 } },
+    pheo:     { rgb: [125, 120, 85], word: 'olive-gray',   pol: 2, rf: { 'tlc-ha': 0.78, 'tlc-hex': 0.10 } },
+    chla:     { rgb: [20, 125, 95],  word: 'blue-green',   pol: 3, rf: { 'tlc-ha': 0.58, 'tlc-hex': 0.04 } },
+    chlb:     { rgb: [125, 165, 35], word: 'yellow-green', pol: 4, rf: { 'tlc-ha': 0.44, 'tlc-hex': 0.03 } },
+    lutein:   { rgb: [235, 205, 25], word: 'yellow',       pol: 5, rf: { 'tlc-ha': 0.30, 'tlc-hex': 0.02 } }
+  };
+  const MIXTURES = {
+    A: { label: 'Mixture A', option: 'Mixture A [Blue #1, Red #40, Yellow #5]', spots: [
+      { id: 'blue',   name: 'FD&C Blue #1',   short: 'Blue #1',   conc: 0.85 },
+      { id: 'red',    name: 'FD&C Red #40',   short: 'Red #40',   conc: 0.90 },
+      { id: 'yellow', name: 'FD&C Yellow #5', short: 'Yellow #5', conc: 1.00 } ] },
+    B: { label: 'Mixture B', option: 'Mixture B [Brilliant Blue, Allura Red, Tartrazine]', spots: [
+      { id: 'blue',   name: 'Brilliant Blue FCF', short: 'Brilliant Blue', conc: 0.60 },
+      { id: 'red',    name: 'Allura Red AC',      short: 'Allura Red',     conc: 1.00 },
+      { id: 'yellow', name: 'Tartrazine',         short: 'Tartrazine',     conc: 0.75 } ] },
+    S: { label: 'Spinach leaf extract', option: 'Spinach Leaf Extract [plant pigments]', spots: [
+      { id: 'carotene', name: 'β-Carotene',            short: 'β-Carotene',   conc: 0.80 },
+      { id: 'pheo',     name: 'Pheophytin a',               short: 'Pheophytin a',      conc: 0.50 },
+      { id: 'chla',     name: 'Chlorophyll a',              short: 'Chlorophyll a',     conc: 1.00 },
+      { id: 'chlb',     name: 'Chlorophyll b',              short: 'Chlorophyll b',     conc: 0.80 },
+      { id: 'lutein',   name: 'Lutein (a xanthophyll)',     short: 'Lutein',            conc: 0.75 } ] }
+  };
+  const TECH = {
+    paper: {
+      solvents: [ ['polar', 'Polar [Water/Ethanol]'], ['hexane', 'Non-Polar [Hexane]'] ],
+      samples: ['A', 'B'],
+      stationary: 'Cellulose paper (polar –OH)', minutes: 30
+    },
+    tlc: {
+      solvents: [ ['ha', 'Non-Polar [Hexane : Acetone 7:3]'], ['hex', 'Non-Polar [Hexane only]'] ],
+      samples: ['S', 'A', 'B'],
+      stationary: 'Silica gel, SiO₂ (polar Si–OH)', minutes: 10
+    }
+  };
+  const SOLVENT_LABEL = {
+    polar: 'Water / Ethanol (polar)', hexane: 'Hexane (non-polar)',
+    ha: 'Hexane : Acetone 7:3 (non-polar)', hex: 'Hexane (non-polar)'
+  };
+
+  // ---------- Geometry ----------
+  const LAB = { jarL: 200, jarR: 500, jarTop: 34, jarBot: 536, paperX: 302, paperW: 96, paperTop: 62, paperBot: 502 };
+  LAB.base = LAB.paperBot - 1.5 * PX;   // pencil origin line (1.5 cm above paper bottom)
+  LAB.surf = LAB.paperBot - 0.6 * PX;   // solvent surface (0.6 cm of paper submerged)
+  LAB.cx = LAB.paperX + LAB.paperW / 2;
+
+  const DX = { x0: 150, x1: 850, sampleEnd: 330, conjStart: 310, conjEnd: 410, memStart: 400, memEnd: 760,
+               absStart: 750, T: 520, C: 620, winL: 420, winR: 720, winTop: 131, winBot: 169,
+               schemY: 318, schemH: 44 };
+
+  // ---------- State ----------
+  const S = {
+    mode: 'lab', running: false, done: false, t: 0, showRuler: false, showKey: false,
+    lab: { tech: 'paper', solvent: 'polar', mixture: 'A', cond: 'paper-polar', T: 12, targetCm: 10, spots: [], results: {} },
+    dx:  { patient: 'A', T: 10, total: 13, xStart: 150, xEnd: 848, stallX: 468, xFront: 150,
+           flowV: 0, stalled: false, tT: null, tC: null, Ti: 0, Ci: 0, particles: [] }
+  };
+  const ruler = { x: 0, y: 0, drag: false, ox: 0, oy: 0 };
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const selTech = $('selTech'), selSolvent = $('selSolvent'), selMix = $('selMix'), selPatient = $('selPatient');
+  function fillLabSelects(){
+    const t = TECH[selTech.value];
+    const prevS = selSolvent.value, prevM = selMix.value;
+    selSolvent.innerHTML = t.solvents.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    selMix.innerHTML = t.samples.map(k => `<option value="${k}">${MIXTURES[k].option}</option>`).join('');
+    if (t.solvents.some(s => s[0] === prevS)) selSolvent.value = prevS;
+    if (t.samples.includes(prevM)) selMix.value = prevM;
+  }
+  fillLabSelects();
+  const btnRun = $('btnRun'), btnReset = $('btnReset'), btnRuler = $('btnRuler'), chkKey = $('chkKey');
+
+  // Paper texture (pre-rendered once)
+  const paperTex = document.createElement('canvas');
+  paperTex.width = LAB.paperW; paperTex.height = LAB.paperBot - LAB.paperTop;
+  (function makeTexture(){
+    const c = paperTex.getContext('2d');
+    c.fillStyle = '#fdfdfa'; c.fillRect(0, 0, paperTex.width, paperTex.height);
+    for (let i = 0; i < 1400; i++){
+      c.strokeStyle = `rgba(120,110,90,${rnd(0.02, 0.07)})`;
+      c.lineWidth = rnd(0.4, 1);
+      const x = rnd(0, paperTex.width), y = rnd(0, paperTex.height), a = rnd(0, Math.PI), l = rnd(2, 7);
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke();
+    }
+  })();
+
+  // TLC plate texture: smooth, matte silica layer
+  const plateTex = document.createElement('canvas');
+  plateTex.width = LAB.paperW; plateTex.height = LAB.paperBot - LAB.paperTop;
+  (function makePlate(){
+    const c = plateTex.getContext('2d');
+    c.fillStyle = '#f5f7f7'; c.fillRect(0, 0, plateTex.width, plateTex.height);
+    for (let i = 0; i < 2500; i++){
+      c.fillStyle = `rgba(110,120,125,${rnd(0.02, 0.06)})`;
+      c.fillRect(rnd(0, plateTex.width), rnd(0, plateTex.height), 1, 1);
+    }
+  })();
+
+  // ---------- Reset / init ----------
+  function resetLab(){
+    const L = S.lab;
+    const sampleChanged = L.mixture !== selMix.value || L.tech !== selTech.value || !L.spots.length;
+    L.tech = selTech.value;
+    L.solvent = selSolvent.value;
+    L.mixture = selMix.value;
+    L.cond = `${L.tech}-${L.solvent}`;
+    // hexane is less viscous than water, so it climbs faster; TLC plates develop faster than paper
+    L.T = L.tech === 'tlc' ? 8 : (L.solvent === 'polar' ? 12 : 9);
+    L.targetCm = Math.round(rnd(9.4, 10.6) * 20) / 20;
+    L.spots = MIXTURES[L.mixture].spots.map(s => {
+      const d = SUBST[s.id];
+      return { ...s, rgb: d.rgb.join(','), word: d.word, pol: d.pol,
+               rf: Math.max(0.005, +(d.rf[L.cond] + (Math.random() - 0.5) * 0.02).toFixed(3)) };
+    });
+    ruler.x = LAB.paperX + LAB.paperW + 2; ruler.y = LAB.base;
+    if (sampleChanged) L.results = {};          // saved TLC runs belong to one sample
+    if (sampleChanged || L.tech === 'paper') buildRfTables();
+    if (sampleChanged) buildRankSlots();
+    renderTheory();
+  }
+  function resetDx(){
+    const D = S.dx;
+    D.patient = selPatient.value;
+    D.xStart = S.mode === 'covid' ? 205 : 150;
+    D.xFront = D.xStart; D.flowV = 0; D.stalled = false;
+    D.tT = null; D.tC = null; D.Ti = 0; D.Ci = 0;
+    D.particles = [];
+    for (let i = 0; i < 70; i++){
+      D.particles.push({ type: 'conj', x: rnd(DX.conjStart + 6, DX.conjEnd - 6), y: rnd(-0.38, 0.38),
+                         bound: false, wet: false, state: 'free', seed: Math.random() });
+    }
+    if (D.patient === 'A'){
+      for (let i = 0; i < 30; i++){
+        D.particles.push({ type: 'ag', x: rnd(D.xStart + 4, DX.sampleEnd - 8), y: rnd(-0.38, 0.38),
+                           bound: false, wet: false, state: 'free', seed: Math.random() });
+      }
+    }
+    ruler.x = DX.x0; ruler.y = 392;
+  }
+  function reset(){
+    S.running = false; S.done = false; S.t = 0;
+    if (S.mode === 'lab') resetLab(); else resetDx();
+    btnRun.disabled = false;
+    document.querySelectorAll('.rchk').forEach(e => e.textContent = '');
+    $('rankMsg').textContent = '';
+    $('rankExplain').classList.add('hidden');
+  }
+
+  // ---------- Lab 1 helpers ----------
+  function labFrontY(){
+    const L = S.lab;
+    const finalY = LAB.base - L.targetCm * PX;
+    const total = LAB.surf - finalY;
+    return LAB.surf - total * Math.sqrt(clamp(S.t / L.T, 0, 1));   // Lucas–Washburn: d ∝ √t
+  }
+  function labFrontPx(){ return Math.max(0, LAB.base - labFrontY()); }
+
+  // ---------- Update ----------
+  function update(dt){
+    if (S.mode === 'lab'){
+      if (S.t >= S.lab.T){
+        S.t = S.lab.T; S.running = false; S.done = true; btnRun.disabled = false;
+        S.lab.results[S.lab.cond] = { spots: S.lab.spots.map(s => ({ ...s })), dS: labFrontPx() / PX };
+      }
+      return;
+    }
+    const D = S.dx;
+    const raw = D.xStart + (D.xEnd - D.xStart) * Math.sqrt(clamp(S.t / D.T, 0, 1));
+    let xf = raw;
+    if (D.patient === 'C' && xf >= D.stallX){ xf = D.stallX; D.stalled = true; }
+    D.flowV = dt > 0 ? (xf - D.xFront) / dt : 0;
+    D.xFront = xf;
+    const reachedEnd = xf >= D.xEnd - 0.5;
+    let v = reachedEnd ? 45 : D.flowV;
+    if (D.stalled) v = 0;
+
+    for (const p of D.particles){
+      if (!p.wet && p.x <= D.xFront){
+        p.wet = true;
+        if (p.type === 'conj' && D.patient === 'A' && p.seed < 0.65) p.bound = true;  // target binds conjugate
+      }
+      if (p.state !== 'free' || p.x > D.xFront) continue;
+      const prev = p.x;
+      p.x = Math.min(p.x + v * dt * (0.75 + 0.5 * Math.random()), D.xFront - 1);
+      p.y = clamp(p.y + rnd(-0.02, 0.02), -0.42, 0.42);
+      if (p.type === 'conj'){
+        if (prev < DX.T && p.x >= DX.T && p.bound && Math.random() < 0.85){ p.state = 'T'; p.x = DX.T + rnd(-2.5, 2.5); }
+        else if (prev < DX.C && p.x >= DX.C && Math.random() < 0.75){ p.state = 'C'; p.x = DX.C + rnd(-2.5, 2.5); }
+      } else if (prev < DX.T && p.x >= DX.T && Math.random() < 0.5){ p.state = 'T'; p.x = DX.T + rnd(-2.5, 2.5); }
+      if (p.state === 'free' && p.x >= DX.absStart + 8){ p.state = 'abs'; p.x = rnd(DX.absStart + 8, 845); }
+    }
+
+    if (D.xFront >= DX.T && D.tT === null) D.tT = S.t;
+    if (D.xFront >= DX.C && D.tC === null) D.tC = S.t;
+    D.Ti = (D.patient === 'A' && D.tT !== null) ? 0.9 * clamp((S.t - D.tT) / 2.5, 0, 1) : 0;
+    D.Ci = (D.tC !== null) ? 0.95 * clamp((S.t - D.tC) / 2.5, 0, 1) : 0;
+
+    if (S.t >= D.total){ S.t = D.total; S.running = false; S.done = true; btnRun.disabled = false; }
+  }
+
+  // ---------- Drawing: shared ----------
+  function drawSpot(cx, cy, rx, ry, rgb, a){
+    ctx.save();
+    ctx.translate(cx, cy); ctx.scale(1, ry / rx);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+    g.addColorStop(0, `rgba(${rgb},${a})`);
+    g.addColorStop(0.55, `rgba(${rgb},${a * 0.8})`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRuler(){
+    if (!S.showRuler) return;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+    if (S.mode === 'lab'){
+      const len = 12, x = ruler.x, y = ruler.y, w = 40;
+      rr(x, y - len * PX - 10, w, len * PX + 20, 4);
+      ctx.fillStyle = 'rgba(255,247,214,0.88)'; ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = '#b8964a'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = '#3a3226';
+      for (let i = 0; i <= len * 10; i++){
+        const yy = y - i * PX / 10;
+        const l = i % 10 === 0 ? 15 : (i % 5 === 0 ? 10 : 6);
+        ctx.lineWidth = i % 10 === 0 ? 1.2 : 0.8;
+        ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + l, yy); ctx.stroke();
+        if (i % 10 === 0) text(String(i / 10), x + 18, yy + 4, { size: 11, weight: 700, color: '#3a3226' });
+      }
+      text('cm', x + 20, y + 8, { size: 9, color: '#6b5d3f', base: 'middle' });
+      ctx.strokeStyle = '#d0302f'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x - 8, y); ctx.lineTo(x, y); ctx.stroke();
+    } else {
+      const len = 21, x = ruler.x, y = ruler.y, h = 40;
+      rr(x - 10, y, len * PX + 20, h, 4);
+      ctx.fillStyle = 'rgba(255,247,214,0.9)'; ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = '#b8964a'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = '#3a3226';
+      for (let i = 0; i <= len * 10; i++){
+        const xx = x + i * PX / 10;
+        const l = i % 10 === 0 ? 15 : (i % 5 === 0 ? 10 : 6);
+        ctx.lineWidth = i % 10 === 0 ? 1.2 : 0.8;
+        ctx.beginPath(); ctx.moveTo(xx, y); ctx.lineTo(xx, y + l); ctx.stroke();
+        if (i % 10 === 0) text(String(i / 10), xx, y + 30, { size: 11, weight: 700, color: '#3a3226', align: 'center' });
+      }
+    }
+    ctx.restore();
+  }
+  function rulerHit(px, py){
+    if (!S.showRuler) return false;
+    if (S.mode === 'lab') return px >= ruler.x && px <= ruler.x + 40 && py >= ruler.y - 12 * PX - 10 && py <= ruler.y + 10;
+    return px >= ruler.x - 10 && px <= ruler.x + 21 * PX + 10 && py >= ruler.y && py <= ruler.y + 40;
+  }
+
+  // ---------- Drawing: Lab 1 ----------
+  function drawLab(){
+    const L = S.lab;
+    // bench
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#f6f8fc'); bg.addColorStop(1, '#e9edf4');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#d6dbe4'; ctx.fillRect(0, LAB.jarBot, W, H - LAB.jarBot);
+
+    // jar interior (back)
+    rr(LAB.jarL, LAB.jarTop, LAB.jarR - LAB.jarL, LAB.jarBot - LAB.jarTop, 14);
+    ctx.fillStyle = 'rgba(215,232,244,0.35)'; ctx.fill();
+
+    // paper strip
+    const fy = labFrontY();
+    const dFront = labFrontPx();
+    ctx.save();
+    ctx.beginPath(); ctx.rect(LAB.paperX, LAB.paperTop, LAB.paperW, LAB.paperBot - LAB.paperTop); ctx.clip();
+    const tlc = L.tech === 'tlc';
+    if (tlc) ctx.drawImage(plateTex, LAB.paperX, LAB.paperTop);
+    else ctx.drawImage(paperTex, LAB.paperX, LAB.paperTop);
+    // wetted region
+    const wet = tlc ? '150,160,170' : (L.solvent === 'polar' ? '140,180,215' : '190,190,150');
+    ctx.fillStyle = `rgba(${wet},${tlc ? 0.2 : (L.solvent === 'polar' ? 0.22 : 0.16)})`;
+    ctx.fillRect(LAB.paperX, fy, LAB.paperW, LAB.paperBot - fy);
+    if (S.t > 0){
+      const g = ctx.createLinearGradient(0, fy - 3, 0, fy + 8);
+      g.addColorStop(0, `rgba(${wet},0)`); g.addColorStop(0.35, `rgba(${wet},0.55)`); g.addColorStop(1, `rgba(${wet},0)`);
+      ctx.fillStyle = g; ctx.fillRect(LAB.paperX, fy - 3, LAB.paperW, 11);
+    }
+    // pencil origin line
+    ctx.strokeStyle = 'rgba(70,70,70,0.65)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(LAB.paperX + 6, LAB.base); ctx.lineTo(LAB.paperX + LAB.paperW - 6, LAB.base); ctx.stroke();
+    // dye spots
+    ctx.globalCompositeOperation = 'multiply';
+    for (const s of L.spots){
+      const travel = s.rf * dFront;
+      const cy = LAB.base - travel;
+      // TLC gives tighter, sharper spots than paper
+      const rx = tlc ? 6.5 + travel * 0.012 : 8 + travel * (L.solvent === 'polar' ? 0.03 : 0.02);
+      const ry = tlc ? 5 + travel * 0.02 : 6.5 + travel * 0.045;
+      const a = s.conc * (0.85 - 0.3 * Math.min(1, travel / 320));
+      if (travel > 12 && !tlc){
+        for (let k = 1; k <= 6; k++){
+          const f = k / 7;
+          drawSpot(LAB.cx, LAB.base - travel * f, rx * 0.65, ry * 0.6, s.rgb, a * 0.06);
+        }
+      }
+      drawSpot(LAB.cx, cy, rx, ry, s.rgb, a);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    // pencil mark of solvent front once complete
+    if (S.done){
+      ctx.strokeStyle = 'rgba(60,60,60,0.8)'; ctx.setLineDash([5, 3]);
+      ctx.beginPath(); ctx.moveTo(LAB.paperX + 4, fy); ctx.lineTo(LAB.paperX + LAB.paperW - 4, fy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+    if (tlc){
+      ctx.strokeStyle = 'rgba(120,150,165,0.9)'; ctx.lineWidth = 2;   // glass backing edge
+      ctx.strokeRect(LAB.paperX, LAB.paperTop, LAB.paperW, LAB.paperBot - LAB.paperTop);
+    } else {
+      ctx.strokeStyle = 'rgba(150,150,140,0.7)'; ctx.lineWidth = 1;
+      ctx.strokeRect(LAB.paperX + 0.5, LAB.paperTop + 0.5, LAB.paperW - 1, LAB.paperBot - LAB.paperTop - 1);
+    }
+
+    // solvent in jar (drawn over paper to tint the submerged part)
+    const liq = L.solvent === 'polar' ? 'rgba(110,170,225,0.35)' : 'rgba(225,222,170,0.32)';
+    ctx.save();
+    rr(LAB.jarL, LAB.jarTop, LAB.jarR - LAB.jarL, LAB.jarBot - LAB.jarTop, 14); ctx.clip();
+    ctx.fillStyle = liq; ctx.fillRect(LAB.jarL, LAB.surf, LAB.jarR - LAB.jarL, LAB.jarBot - LAB.surf);
+    ctx.strokeStyle = L.solvent === 'polar' ? 'rgba(70,130,190,0.7)' : 'rgba(170,165,90,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(LAB.jarL, LAB.surf + 3); ctx.quadraticCurveTo(LAB.jarL + 8, LAB.surf, LAB.jarL + 20, LAB.surf);
+    ctx.lineTo(LAB.jarR - 20, LAB.surf); ctx.quadraticCurveTo(LAB.jarR - 8, LAB.surf, LAB.jarR, LAB.surf + 3); ctx.stroke();
+    ctx.restore();
+
+    // glass walls + highlights
+    rr(LAB.jarL, LAB.jarTop, LAB.jarR - LAB.jarL, LAB.jarBot - LAB.jarTop, 14);
+    ctx.strokeStyle = 'rgba(100,130,155,0.85)'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(LAB.jarL + 8, LAB.jarTop + 20, 6, LAB.jarBot - LAB.jarTop - 50);
+    ctx.fillRect(LAB.jarR - 20, LAB.jarTop + 30, 3, LAB.jarBot - LAB.jarTop - 70);
+    // lid, rod, clip
+    rr(LAB.jarL - 10, LAB.jarTop - 12, LAB.jarR - LAB.jarL + 20, 12, 3);
+    ctx.fillStyle = '#9aa6b6'; ctx.fill();
+    ctx.strokeStyle = '#6f7a88'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(LAB.jarL + 24, 52); ctx.lineTo(LAB.jarR - 24, 52); ctx.stroke();
+    ctx.lineCap = 'butt';
+    rr(LAB.cx - 13, 44, 26, 26, 3); ctx.fillStyle = '#222'; ctx.fill();
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(LAB.cx - 8, 44); ctx.lineTo(LAB.cx - 4, 34); ctx.moveTo(LAB.cx + 8, 44); ctx.lineTo(LAB.cx + 4, 34); ctx.stroke();
+
+    // labels to the left of the strip
+    text('origin', LAB.paperX - 8, LAB.base + 4, { size: 11, align: 'right', color: '#444', weight: 600 });
+    text('(pencil)', LAB.paperX - 8, LAB.base + 16, { size: 10, align: 'right', color: '#777' });
+    text('solvent', LAB.jarL + 22, LAB.surf + 18, { size: 11, color: '#3b5470' });
+    if (S.done){
+      text('solvent front', LAB.paperX - 8, fy + 4, { size: 11, align: 'right', color: '#444', weight: 600 });
+      text('(pencil)', LAB.paperX - 8, fy + 16, { size: 10, align: 'right', color: '#777' });
+    }
+
+    drawLabPanel(dFront);
+    drawRuler();
+  }
+
+  function drawLabPanel(dFront){
+    const L = S.lab, x = 540, y = 30, w = 390, h = 500;
+    rr(x, y, w, h, 12); ctx.fillStyle = 'rgba(255,255,255,0.94)'; ctx.fill();
+    ctx.strokeStyle = '#d8dde7'; ctx.lineWidth = 1; ctx.stroke();
+    let yy = y + 32;
+    const tech = TECH[L.tech];
+    text(L.tech === 'tlc' ? 'TLC Developing Chamber' : 'Paper Chromatography Chamber', x + 20, yy, { size: 18, weight: 700 }); yy += 30;
+    text('Mobile phase:', x + 20, yy, { weight: 700, size: 13 });
+    text(SOLVENT_LABEL[L.solvent], x + 120, yy, { size: 13 }); yy += 20;
+    text('Stationary phase:', x + 20, yy, { weight: 700, size: 13 });
+    text(tech.stationary, x + 140, yy, { size: 13 }); yy += 20;
+    const minutes = Math.round(S.t / L.T * tech.minutes);
+    text('Elapsed:', x + 20, yy, { weight: 700, size: 13 });
+    text(`${minutes} min`, x + 85, yy, { size: 13 }); yy += 20;
+    const status = S.done ? 'Complete: front marked in pencil' : (S.running ? 'Developing (capillary action)…' : 'Ready: press Run Simulation');
+    text('Status:', x + 20, yy, { weight: 700, size: 13 });
+    text(status, x + 75, yy, { size: 13, color: S.done ? '#1d8a4b' : (S.running ? '#b26b00' : '#5a6477') }); yy += 30;
+
+    text(`Sample: ${MIXTURES[L.mixture].label}`, x + 20, yy, { size: 15, weight: 700 }); yy += 21;
+    for (const s of L.spots){
+      ctx.beginPath(); ctx.arc(x + 28, yy - 4, 6, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${s.rgb})`; ctx.fill();
+      text(`${s.name}  (${s.word})`, x + 42, yy, { size: 13 }); yy += 19;
+    }
+    yy += 12;
+    const keyNow = S.showKey && S.done;
+    if (!keyNow){
+    rr(x + 14, yy - 4, w - 28, 104, 8); ctx.fillStyle = '#f4f7fd'; ctx.fill();
+    text('Measuring Rₑ', x + 26, yy + 16, { size: 13, weight: 700 });
+    const lines = [
+      '1. Run until the solvent front stops moving.',
+      '2. Toggle the ruler and drag its 0 mark to the origin.',
+      '3. Measure origin → front (d_solvent) and origin',
+      '    → the CENTER of each spot (d_solute).',
+      '4. Rf = d_solute ÷ d_solvent'
+    ];
+    lines.forEach((l, i) => text(l, x + 26, yy + 34 + i * 16, { size: 12, color: '#3b4456' }));
+    // fix subscript label text (canvas has no subscript): overwrite heading cleanly
+    ctx.fillStyle = '#f4f7fd'; ctx.fillRect(x + 24, yy + 3, 150, 18);
+    text('Measuring Rf', x + 26, yy + 16, { size: 13, weight: 700 });
+    yy += 124;
+    }
+
+    if (S.showKey){
+      text('Answer key', x + 20, yy, { size: 15, weight: 700, color: '#8a1c1c' }); yy += 20;
+      if (!S.done){
+        text('Values appear after the run is complete.', x + 20, yy, { size: 12, color: '#5a6477' });
+      } else {
+        const dS = dFront / PX;
+        text(`d_solvent = ${dS.toFixed(2)} cm`, x + 20, yy, { size: 13 }); yy += 20;
+        text('Substance', x + 20, yy,{ size: 11, weight: 700, color: '#5a6477' });
+        text('d_solute (cm)', x + 200, yy, { size: 11, weight: 700, color: '#5a6477' });
+        text('Rf', x + 310, yy, { size: 11, weight: 700, color: '#5a6477' }); yy += 18;
+        [...L.spots].sort((a, b) => b.rf - a.rf).forEach(s => {
+          ctx.beginPath(); ctx.arc(x + 26, yy - 4, 5, 0, Math.PI * 2); ctx.fillStyle = `rgb(${s.rgb})`; ctx.fill();
+          text(s.name, x + 36, yy, { size: 12 });
+          text((s.rf * dS).toFixed(2), x + 200, yy, { size: 12 });
+          text(s.rf.toFixed(2), x + 310, yy, { size: 12, weight: 700 });
+          yy += 18;
+        });
+        yy += 8;
+        const order = [...L.spots].sort((a, b) => a.pol - b.pol).map(s => s.short).join(' < ');
+        text('Increasing polarity:', x + 20, yy, { size: 12, weight: 700 }); yy += 17;
+        // wrap long orderings onto two lines
+        const parts = order.split(' < ');
+        if (parts.length > 3){
+          text(parts.slice(0, 3).join(' < ') + ' <', x + 20, yy, { size: 12 }); yy += 16;
+          text(parts.slice(3).join(' < '), x + 20, yy, { size: 12 });
+        } else text(order, x + 20, yy, { size: 12 });
+      }
+    }
+  }
+
+  // ---------- Drawing: Diagnostic tests ----------
+  function pinkAt(x){
+    const D = S.dx;
+    if (x > D.xFront) return (x >= DX.conjStart && x <= DX.conjEnd) ? 0.55 : 0;
+    if (x < DX.conjStart) return 0;
+    const behind = D.xFront - x;
+    let a = 0.5 * Math.exp(-behind / 75);
+    if (x >= DX.conjStart && x <= DX.conjEnd) a = Math.max(a, 0.55 * Math.exp(-behind / 45));
+    const reachedEnd = D.xFront >= D.xEnd - 0.5;
+    if (reachedEnd && !D.stalled){
+      if (x >= DX.absStart) a = Math.max(a * 0.6, 0.22);
+      else a *= clamp(1 - (S.t - D.T) / 2.5, 0, 1);
+    }
+    return a;
+  }
+
+  function drawLines(top, bot){
+    const D = S.dx;
+    if (D.Ti > 0){ ctx.fillStyle = `rgba(160,22,70,${D.Ti})`; ctx.fillRect(DX.T - 4, top, 8, bot - top); }
+    if (D.Ci > 0){ ctx.fillStyle = `rgba(160,22,70,${D.Ci})`; ctx.fillRect(DX.C - 4, top, 8, bot - top); }
+  }
+
+  function drawWindow(){
+    const D = S.dx;
+    // inset frame
+    rr(DX.winL - 6, DX.winTop - 6, DX.winR - DX.winL + 12, DX.winBot - DX.winTop + 12, 6);
+    ctx.fillStyle = '#c9ced8'; ctx.fill();
+    ctx.fillStyle = '#fbfbf8'; ctx.fillRect(DX.winL, DX.winTop, DX.winR - DX.winL, DX.winBot - DX.winTop);
+    for (let x = DX.winL; x < DX.winR; x += 2){
+      if (x <= D.xFront){
+        ctx.fillStyle = 'rgba(190,200,212,0.28)'; ctx.fillRect(x, DX.winTop, 2, DX.winBot - DX.winTop);
+        const a = pinkAt(x);
+        if (a > 0.005){ ctx.fillStyle = `rgba(205,70,110,${a * 0.6})`; ctx.fillRect(x, DX.winTop, 2, DX.winBot - DX.winTop); }
+      }
+    }
+    drawLines(DX.winTop + 3, DX.winBot - 3);
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+    ctx.strokeRect(DX.winL + 0.5, DX.winTop + 0.5, DX.winR - DX.winL - 1, DX.winBot - DX.winTop - 1);
+    text('T', DX.T, DX.winTop - 12, { size: 16, weight: 800, align: 'center', color: '#3b4456' });
+    text('C', DX.C, DX.winTop - 12, { size: 16, weight: 800, align: 'center', color: '#3b4456' });
+  }
+
+  function drawCovidCassette(){
+    const D = S.dx;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 4;
+    rr(130, 70, 720, 160, 26);
+    const g = ctx.createLinearGradient(0, 70, 0, 230);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#e6e9ef');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#b9c0cc'; ctx.lineWidth = 1.5; rr(130, 70, 720, 160, 26); ctx.stroke();
+    // sample well
+    ctx.beginPath(); ctx.arc(220, 150, 34, 0, Math.PI * 2); ctx.fillStyle = '#d3d8e1'; ctx.fill();
+    ctx.beginPath(); ctx.arc(220, 150, 24, 0, Math.PI * 2); ctx.fillStyle = '#efe9dc'; ctx.fill();
+    if (S.t > 0.4){ ctx.beginPath(); ctx.arc(220, 150, 24, 0, Math.PI * 2); ctx.fillStyle = 'rgba(170,190,205,0.45)'; ctx.fill(); }
+    text('S', 220, 205, { size: 16, weight: 800, align: 'center', color: '#3b4456' });
+    // falling drops
+    if (S.running && S.t < 1.2){
+      for (let k = 0; k < 3; k++){
+        const tt = S.t - k * 0.3;
+        if (tt > 0 && tt < 0.45){
+          const yy = 20 + (tt / 0.45) * 128;
+          ctx.beginPath(); ctx.moveTo(220, yy - 9);
+          ctx.quadraticCurveTo(226, yy, 220, yy + 5); ctx.quadraticCurveTo(214, yy, 220, yy - 9);
+          ctx.fillStyle = 'rgba(120,160,200,0.85)'; ctx.fill();
+        }
+      }
+    }
+    drawWindow();
+    text('SARS-CoV-2 Antigen', 790, 110, { size: 12, weight: 700, align: 'right', color: '#5a6477' });
+    text('Rapid Test', 790, 126, { size: 11, align: 'right', color: '#8a93a3' });
+    // arrow
+    ctx.strokeStyle = '#9aa3b2'; ctx.fillStyle = '#9aa3b2'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(275, 150); ctx.lineTo(380, 150); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(388, 150); ctx.lineTo(378, 144); ctx.lineTo(378, 156); ctx.closePath(); ctx.fill();
+  }
+
+  function drawPregStick(){
+    const D = S.dx;
+    // absorbent wick (exposed)
+    rr(112, 118, 140, 64, 18);
+    ctx.fillStyle = '#f3efe6'; ctx.fill();
+    ctx.strokeStyle = '#cfc6b4'; ctx.lineWidth = 1; ctx.stroke();
+    if (S.t > 0){
+      ctx.save(); rr(112, 118, 140, 64, 18); ctx.clip();
+      ctx.fillStyle = 'rgba(215,200,110,0.35)';
+      ctx.fillRect(112, 118, Math.min(D.xFront, 252) - 112 + 40, 64);
+      ctx.restore();
+    }
+    ctx.strokeStyle = 'rgba(180,170,150,0.5)';
+    for (let i = 0; i < 9; i++){ ctx.beginPath(); ctx.moveTo(125 + i * 13, 122); ctx.lineTo(125 + i * 13, 178); ctx.stroke(); }
+    // body
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 4;
+    rr(230, 98, 650, 104, 44);
+    const g = ctx.createLinearGradient(0, 98, 0, 202);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#e3ebf5');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#b5c2d4'; ctx.lineWidth = 1.5; rr(230, 98, 650, 104, 44); ctx.stroke();
+    // grip ridges
+    ctx.strokeStyle = '#c9d3e0'; ctx.lineWidth = 2;
+    for (let i = 0; i < 6; i++){ ctx.beginPath(); ctx.moveTo(770 + i * 12, 118); ctx.lineTo(770 + i * 12, 182); ctx.stroke(); }
+    text('hCG', 300, 156, { size: 18, weight: 800, color: '#7a8aa3' });
+    // sample stream drops onto wick
+    if (S.running && S.t < 1.5){
+      for (let k = 0; k < 5; k++){
+        const tt = (S.t * 3 + k * 0.2) % 1;
+        ctx.beginPath(); ctx.arc(150 + k * 10, 30 + tt * 85, 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(215,195,90,0.7)'; ctx.fill();
+      }
+    }
+    drawWindow();
+  }
+
+  function drawSchematic(){
+    const D = S.dx, y = DX.schemY, h = DX.schemH;
+    text('Cutaway: inside the test strip', DX.x0, y - 18, { size: 13, weight: 700, color: '#3b4456' });
+    // backing card
+    ctx.fillStyle = '#5d6676'; ctx.fillRect(DX.x0, y + h, DX.x1 - DX.x0, 6);
+    // pads
+    ctx.fillStyle = '#efe7d6'; ctx.fillRect(DX.x0, y + 4, DX.sampleEnd - DX.x0, h - 4);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(DX.memStart, y + 10, DX.memEnd - DX.memStart, h - 10);
+    ctx.fillStyle = '#f1ebe0'; ctx.fillRect(DX.conjStart, y + 2, DX.conjEnd - DX.conjStart, h - 2);
+    ctx.fillStyle = '#e6dfcf'; ctx.fillRect(DX.absStart, y, DX.x1 - DX.absStart, h);
+    // wet + conjugate colour
+    for (let x = DX.x0; x < DX.x1; x += 2){
+      const top = (x >= DX.absStart) ? y : (x >= DX.conjStart && x <= DX.conjEnd) ? y + 2 : (x < DX.sampleEnd) ? y + 4 : y + 10;
+      if (x <= D.xFront && S.t > 0){ ctx.fillStyle = 'rgba(150,175,200,0.25)'; ctx.fillRect(x, top, 2, y + h - top); }
+      const a = pinkAt(x);
+      if (a > 0.005){ ctx.fillStyle = `rgba(200,55,95,${a * 0.55})`; ctx.fillRect(x, top, 2, y + h - top); }
+    }
+    // immobilised antibody lines (always faintly marked)
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(90,100,120,0.5)'; ctx.lineWidth = 1;
+    [DX.T, DX.C].forEach(xx => { ctx.beginPath(); ctx.moveTo(xx, y + 10); ctx.lineTo(xx, y + h); ctx.stroke(); });
+    ctx.setLineDash([]);
+    drawLines(y + 11, y + h - 1);
+    // outlines
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
+    ctx.strokeRect(DX.x0 + 0.5, y + 4.5, DX.sampleEnd - DX.x0, h - 4);
+    ctx.strokeRect(DX.memStart + 0.5, y + 10.5, DX.memEnd - DX.memStart, h - 10);
+    ctx.strokeRect(DX.conjStart + 0.5, y + 2.5, DX.conjEnd - DX.conjStart, h - 2);
+    ctx.strokeRect(DX.absStart + 0.5, y + 0.5, DX.x1 - DX.absStart - 1, h);
+    // liquid front marker
+    if (S.t > 0 && D.xFront < DX.x1 - 2){
+      ctx.strokeStyle = 'rgba(40,90,160,0.8)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(D.xFront, y - 2); ctx.lineTo(D.xFront, y + h + 2); ctx.stroke();
+    }
+    // particles
+    for (const p of D.particles){
+      if (p.type === 'ag' && !p.wet) continue;
+      const py = y + h / 2 + 5 + p.y * (h - 12);
+      if (p.type === 'conj'){
+        ctx.beginPath(); ctx.arc(p.x, py, 2.6, 0, Math.PI * 2); ctx.fillStyle = '#a3123d'; ctx.fill();
+        if (p.bound){ ctx.beginPath(); ctx.arc(p.x + 2.4, py - 1.6, 1.7, 0, Math.PI * 2); ctx.fillStyle = '#23a050'; ctx.fill(); }
+      } else {
+        ctx.beginPath(); ctx.arc(p.x, py, 2, 0, Math.PI * 2); ctx.fillStyle = '#23a050'; ctx.fill();
+      }
+    }
+    // labels
+    text('T', DX.T, y + 2, { size: 12, weight: 800, align: 'center', color: '#3b4456' });
+    text('C', DX.C, y + 2, { size: 12, weight: 800, align: 'center', color: '#3b4456' });
+    const ly = y + h + 22;
+    text('Sample pad', (DX.x0 + DX.conjStart) / 2, ly, { size: 11, align: 'center', color: '#5a6477' });
+    text('Conjugate pad', (DX.conjStart + DX.conjEnd) / 2 + 4, ly, { size: 11, align: 'center', color: '#5a6477' });
+    text('Nitrocellulose membrane (stationary phase)', (DX.conjEnd + DX.absStart) / 2 + 10, ly, { size: 11, align: 'center', color: '#5a6477' });
+    text('Absorbent pad', (DX.absStart + DX.x1) / 2, ly, { size: 11, align: 'center', color: '#5a6477' });
+  }
+
+  function drawDxLegend(){
+    const y = 470, analyte = S.mode === 'covid' ? 'SARS-CoV-2 nucleocapsid (N) antigen' : 'hCG hormone';
+    rr(30, y - 18, 900, 78, 10); ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fill();
+    ctx.strokeStyle = '#d8dde7'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.beginPath(); ctx.arc(50, y, 4, 0, Math.PI * 2); ctx.fillStyle = '#a3123d'; ctx.fill();
+    text('Gold-nanoparticle–antibody conjugate', 62, y + 4, { size: 12 });
+    ctx.beginPath(); ctx.arc(330, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = '#23a050'; ctx.fill();
+    text(`Target: ${analyte}`, 342, y + 4, { size: 12 });
+    ctx.beginPath(); ctx.arc(670, y, 4, 0, Math.PI * 2); ctx.fillStyle = '#a3123d'; ctx.fill();
+    ctx.beginPath(); ctx.arc(674, y - 2.5, 2.2, 0, Math.PI * 2); ctx.fillStyle = '#23a050'; ctx.fill();
+    text('Conjugate with bound target', 684, y + 4, { size: 12 });
+    text('T line = immobilized capture antibody (binds target) • C line = immobilized anti-IgG antibody (binds any conjugate)', 50, y + 28, { size: 12, color: '#5a6477' });
+    text('Mobile phase = sample liquid • Movement by capillary action toward the absorbent pad', 50, y + 46, { size: 12, color: '#5a6477' });
+  }
+
+  function drawBanner(){
+    const D = S.dx;
+    let msg = '', col = '#5a6477', bg = '#f1f3f7';
+    if (S.running && D.stalled){ msg = '⚠ Flow has stopped: the liquid front is no longer moving.'; col = '#b26b00'; bg = '#fff4e0'; }
+    else if (S.running){ msg = 'Sample migrating by capillary action…'; }
+    else if (!S.done){ msg = 'Select a patient sample and press Run Simulation.'; }
+    else if (!S.showKey){ msg = 'Run complete (read time reached). Read the window: which lines appeared?'; col = '#2f6fde'; bg = '#e7efff'; }
+    else {
+      const covid = S.mode === 'covid';
+      if (D.patient === 'A'){ msg = covid ? 'POSITIVE: C and T lines visible. SARS-CoV-2 antigen detected.' : 'POSITIVE: C and T lines visible. hCG detected (pregnant).'; col = '#8a1c3c'; bg = '#fde8ee'; }
+      else if (D.patient === 'B'){ msg = covid ? 'NEGATIVE: C line only. No antigen detected above the detection limit.' : 'NEGATIVE: C line only. No hCG detected above the detection limit.'; col = '#1d6b40'; bg = '#e4f5ea'; }
+      else { msg = 'INVALID: No C line. Flow failed (insufficient sample). Repeat with a new test.'; col = '#8a5a00'; bg = '#fff4e0'; }
+    }
+    rr(130, 246, 720, 34, 8); ctx.fillStyle = bg; ctx.fill();
+    text(msg, 490, 268, { size: 14, weight: 700, align: 'center', color: col });
+  }
+
+  function drawDx(){
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#f6f8fc'); bg.addColorStop(1, '#eaeef5');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    const title = S.mode === 'covid' ? 'Model 1: Rapid Antigen Test (SARS-CoV-2)' : 'Model 2: Urine Pregnancy Test (hCG)';
+    text(title, 30, 40, { size: 17, weight: 700 });
+    const mins = Math.round(S.t / S.dx.total * 15);
+    text(`Elapsed: ${mins} min  (read at 15 min)`, 930, 40, { size: 13, align: 'right', color: '#5a6477' });
+    if (S.mode === 'covid') drawCovidCassette(); else drawPregStick();
+    drawBanner();
+    drawSchematic();
+    drawDxLegend();
+    drawRuler();
+  }
+
+  // ---------- Main loop ----------
+  let last = performance.now();
+  function frame(now){
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (S.running){ S.t += dt; update(dt); }
+    ctx.clearRect(0, 0, W, H);
+    if (S.mode === 'lab') drawLab(); else drawDx();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Pointer: draggable ruler ----------
+  function toCanvas(e){
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+  }
+  canvas.addEventListener('pointerdown', e => {
+    const p = toCanvas(e);
+    if (rulerHit(p.x, p.y)){
+      ruler.drag = true; ruler.ox = p.x - ruler.x; ruler.oy = p.y - ruler.y;
+      canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing';
+    }
+  });
+  canvas.addEventListener('pointermove', e => {
+    const p = toCanvas(e);
+    if (ruler.drag){
+      ruler.x = clamp(p.x - ruler.ox, -20, W - 20);
+      ruler.y = clamp(p.y - ruler.oy, 10, H - 10);
+    } else {
+      canvas.style.cursor = rulerHit(p.x, p.y) ? 'grab' : 'default';
+    }
+  });
+  const endDrag = () => { ruler.drag = false; canvas.style.cursor = 'default'; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  window.addEventListener('keydown', e => {
+    if (!S.showRuler) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT') return;
+    const step = e.shiftKey ? 5 : 0.5;
+    if (e.key === 'ArrowUp'){ ruler.y -= step; e.preventDefault(); }
+    if (e.key === 'ArrowDown'){ ruler.y += step; e.preventDefault(); }
+    if (e.key === 'ArrowLeft'){ ruler.x -= step; e.preventDefault(); }
+    if (e.key === 'ArrowRight'){ ruler.x += step; e.preventDefault(); }
+  });
+
+  // ---------- Controls ----------
+  function setMode(mode){
+    S.mode = mode;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+    const lab = mode === 'lab';
+    $('labControls').classList.toggle('hidden', !lab);
+    $('dxControls').classList.toggle('hidden', lab);
+    $('labInfo').classList.toggle('hidden', !lab);
+    $('dxInfo').classList.toggle('hidden', lab);
+    $('hint').textContent = lab
+      ? 'Tip: turn on the ruler, then drag it (or use the arrow keys; hold Shift for bigger steps) so its 0 mark lines up with the origin line.'
+      : 'Tip: watch the cutaway view to see where the gold conjugate (red) and the target (green) are captured.';
+    if (!lab){
+      $('dxIntro').innerHTML = mode === 'covid'
+        ? 'A rapid antigen test detects the SARS-CoV-2 <b>nucleocapsid (N) protein</b> in a nasal swab sample mixed with buffer. It is a <b>lateral flow immunoassay</b>, which works like chromatography: the liquid sample is the mobile phase and the nitrocellulose membrane is the stationary phase.'
+        : 'A home pregnancy test detects <b>human chorionic gonadotropin (hCG)</b>, a hormone made after implantation, in urine. It is a <b>lateral flow immunoassay</b>, which works like chromatography: urine is the mobile phase and the nitrocellulose membrane is the stationary phase.';
+    }
+    reset();
+  }
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
+  [selSolvent, selMix, selPatient].forEach(s => s.addEventListener('change', reset));
+  selTech.addEventListener('change', () => {
+    fillLabSelects();
+    selSolvent.selectedIndex = 0; selMix.selectedIndex = 0;   // each technique opens on its own default
+    reset();
+  });
+  btnRun.addEventListener('click', () => {
+    if (S.done || S.t > 0) reset();
+    S.running = true; btnRun.disabled = true;
+  });
+  btnReset.addEventListener('click', reset);
+  btnRuler.addEventListener('click', () => {
+    S.showRuler = !S.showRuler;
+    btnRuler.classList.toggle('on', S.showRuler);
+  });
+  chkKey.addEventListener('change', () => { S.showKey = chkKey.checked; });
+
+  // ---------- Rf data table ----------
+  // Paper: one table for the current run.
+  // TLC: one table per mobile phase, kept across runs so the two can be compared.
+  const tablesEl = $('rfTables');
+  function substanceOptions(){
+    return '<option value="">–</option>' + S.lab.spots.map(s => `<option value="${s.id}">${s.short} (${s.word})</option>`).join('');
+  }
+  function tableBlock(key, title){
+    const n = S.lab.spots.length;
+    let rows = '';
+    for (let i = 0; i < n; i++){
+      const label = i === 0 ? 'Spot 1 (lowest)' : (i === n - 1 ? `Spot ${n} (highest)` : `Spot ${i + 1}`);
+      rows += `<tr><td>${label}</td>
+        <td><select class="col">${substanceOptions()}</select></td>
+        <td><input type="number" class="ds" step="0.05" min="0" placeholder="cm"></td>
+        <td class="rf">–</td><td class="chk"></td></tr>`;
+    }
+    return `<div class="rfblock" data-key="${key}" style="margin-bottom:16px">
+      ${title ? `<h3 style="margin-top:4px">${title}</h3>` : ''}
+      <table><tr><td><b>d<sub>solvent</sub></b> (origin &rarr; front)</td>
+        <td><input type="number" class="dsolv" step="0.05" min="0" placeholder="cm"> cm</td></tr></table>
+      <table style="margin-top:6px">
+        <thead><tr><th>Spot</th><th>Substance</th><th>d<sub>solute</sub> (cm)</th><th>R<sub>f</sub></th><th></th></tr></thead>
+        <tbody class="rows">${rows}</tbody>
+      </table>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btnCheck">Check my R<sub>f</sub> values</button>
+        <span class="checkMsg" style="font-size:13px;color:var(--muted)"></span>
+      </div></div>`;
+  }
+  function buildRfTables(){
+    if (S.lab.tech === 'tlc'){
+      $('rfTitle').innerHTML = 'R<sub>f</sub> data tables: comparing mobile phases';
+      $('rfIntro').innerHTML = 'Run the same sample with <b>both</b> mobile phases and fill in a table for each. Measure to the <b>center</b> of each spot, starting from the origin (pencil baseline).';
+      tablesEl.innerHTML = tableBlock('tlc-ha', 'Table 1: Mobile phase Hexane : Acetone (7:3)') +
+                           tableBlock('tlc-hex', 'Table 2: Mobile phase Hexane only');
+    } else {
+      $('rfTitle').innerHTML = 'R<sub>f</sub> data table';
+      $('rfIntro').innerHTML = 'Measure to the <b>center</b> of each spot, starting from the origin (pencil baseline).';
+      tablesEl.innerHTML = tableBlock('current', '');
+    }
+  }
+
+  // ---------- Polarity ranking ----------
+  function buildRankSlots(){
+    const n = S.lab.spots.length, box = $('rankSlots');
+    let html = '';
+    for (let i = 0; i < n; i++){
+      const tag = i === 0 ? ' (least polar)' : (i === n - 1 ? ' (most polar)' : '');
+      html += `<div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:13px;font-weight:700;color:var(--muted)">${i + 1}${tag}</span>
+        <select class="rank">${substanceOptions()}</select><span class="rchk"></span></div>`;
+      if (i < n - 1) html += '<span style="color:var(--muted);font-weight:700">&lt;</span>';
+    }
+    box.innerHTML = html;
+    $('rankMsg').textContent = '';
+    $('rankExplain').classList.add('hidden');
+  }
+  function rankExplanation(){
+    const L = S.lab;
+    const order = [...L.spots].sort((a, b) => a.pol - b.pol).map(s => s.short).join(' &lt; ');
+    if (L.cond === 'paper-polar'){
+      return `<b>Correct: ${order}.</b> In this run the mobile phase (water/ethanol) is <b>more polar than the stationary phase</b> (cellulose paper). "Like dissolves like": the most polar dye, Tartrazine, has three anionic groups (2 SO<sub>3</sub><sup>&minus;</sup> + COO<sup>&minus;</sup>). It forms the strongest ion–dipole and hydrogen-bond attractions with the polar solvent, so it spends the most time in the mobile phase and travels farthest. In this run, <b>higher R<sub>f</sub> = more polar</b>. Run it again in hexane and the R<sub>f</sub> order flips, but the polarity ranking stays the same.`;
+    }
+    if (L.mixture === 'S'){
+      return `<b>Correct: ${order}.</b> Silica gel is very polar (surface Si–OH groups) and the hexane-based mobile phase is non-polar. &beta;-Carotene is a pure hydrocarbon, attracted only by London (dispersion) forces. It barely interacts with the silica, stays dissolved in the mobile phase, and runs near the front. Pheophytin and the chlorophylls have polar C=O and ester groups; chlorophyll b's extra C=O (an aldehyde, CHO, in place of CH<sub>3</sub>) makes it more polar than chlorophyll a. Lutein has two O–H groups that hydrogen-bond strongly to Si–OH. So <b>lower R<sub>f</sub> = more polar</b>.`;
+    }
+    return `<b>Correct: ${order}.</b> The stationary phase (${L.tech === 'tlc' ? 'silica gel' : 'cellulose paper'}) is polar and the mobile phase is non-polar. The ionic dyes are held to the stationary phase by ion–dipole and hydrogen-bond attractions and hardly dissolve in the mobile phase. The most polar dye (Tartrazine, 3 anionic groups) is held most strongly and barely leaves the origin. So <b>lower R<sub>f</sub> = more polar</b>.`;
+  }
+  $('btnRank').addEventListener('click', () => {
+    const msg = $('rankMsg'), ex = $('rankExplain');
+    ex.classList.add('hidden');
+    if (S.mode !== 'lab' || !S.done){ msg.textContent = 'Run the chromatogram to completion first, then use your data.'; return; }
+    const sels = [...document.querySelectorAll('#rankSlots .rank')];
+    const vals = sels.map(s => s.value);
+    if (vals.some(v => !v)){ msg.textContent = 'Fill in every position first.'; return; }
+    if (new Set(vals).size !== vals.length){ msg.textContent = 'Each substance can appear only once.'; return; }
+    const correct = [...S.lab.spots].sort((a, b) => a.pol - b.pol).map(s => s.id);
+    let n = 0;
+    sels.forEach((s, i) => {
+      const ok = vals[i] === correct[i];
+      if (ok) n++;
+      s.parentElement.querySelector('.rchk').innerHTML = ok ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+    });
+    if (n === correct.length){
+      msg.innerHTML = '<span class="ok">All positions correct!</span>';
+      ex.innerHTML = rankExplanation(); ex.classList.remove('hidden');
+    } else {
+      msg.textContent = `${n}/${correct.length} positions correct. Hint: decide whether the more polar substances are more attracted to the stationary phase or to the mobile phase in this run.`;
+    }
+  });
+
+  // ---------- Theory card ----------
+  function renderTheory(){
+    const L = S.lab, el = $('labTheory');
+    const origin = '<li>Why must the origin line sit <i>above</i> the solvent level, and why is it drawn in pencil, not pen?</li>';
+    $('compareRuns').classList.toggle('hidden', L.tech === 'tlc');
+    $('discussList').innerHTML = L.tech === 'tlc'
+      ? `<li>Which dye has the strongest attraction to the stationary phase in Hexane and Hexane:Acetone? Justify your answer with quantifiable experimental data.</li>
+         <li>What effect does having Hexane:Acetone mobile phase have on the retention factor when compared with just use the pure Hexane mobile phase. Why is that?</li>
+         <li>Why are the R<sub>f</sub> lower with just the Hexane Mobile phase?</li>${origin}`
+      : `<li>Which dye has the strongest attraction to the stationary phase in hexane? How do you know?</li>
+         <li>Why does switching to hexane leave the dyes near the origin even though the solvent front still rises?</li>${origin}`;
+    const rfEq = '<p class="formula" style="text-align:center">R<sub>f</sub> = d<sub>solute</sub> &divide; d<sub>solvent</sub></p>';
+    const common = '<p>Components separate according to their <b>relative attraction</b>, through intermolecular forces, to the <b>stationary phase</b> and to the <b>mobile phase</b>. A substance more attracted to the mobile phase travels farther, so it has a higher R<sub>f</sub>.</p>';
+    if (L.tech === 'paper'){
+      el.innerHTML = `<h2>How paper chromatography works</h2>
+        <p><b>Stationary phase:</b> cellulose paper, which is polar. Its many –OH groups hydrogen-bond to solutes and hold a thin film of water.<br>
+        <b>Mobile phase:</b> the solvent climbs the paper by capillary action.</p>${common}${rfEq}
+        <h3>Polar vs. non-polar mobile phase</h3>
+        <ul>
+          <li><b>Water/Ethanol (polar):</b> these food dyes are ionic sodium sulfonate salts, so they dissolve readily in the polar solvent. Here the mobile phase is <b>more polar than the stationary phase</b>. "Like dissolves like": the most polar dye, Tartrazine, is most attracted to the polar mobile phase, so it travels farthest and has the <b>highest R<sub>f</sub></b>.</li>
+          <li><b>Hexane (non-polar):</b> "like dissolves like." Ionic dyes barely dissolve in hexane, so they stay bound to the polar paper (R<sub>f</sub> &asymp; 0–0.1) while the front still climbs. Now the mobile phase is <b>less polar than the stationary phase</b>, so the order <b>flips</b>: the least polar dye, Red 40, creeps slightly, and Tartrazine barely moves.</li>
+        </ul>
+        <p class="note">Mixture B lists the <i>chemical names</i> of the same three FD&amp;C dyes (Brilliant Blue FCF = Blue #1, Allura Red AC = Red #40, Tartrazine = Yellow #5), so their R<sub>f</sub> values match Mixture A. That is how chromatography identifies a compound. All R<sub>f</sub> values are illustrative, and the front height changes a little on each run.</p>`;
+    } else {
+      el.innerHTML = `<h2>How thin layer chromatography (TLC) works</h2>
+        <p><b>Stationary phase:</b> a thin layer of <b>silica gel (SiO<sub>2</sub>)</b> on a glass or aluminium plate. Its surface is covered in Si–OH groups, which make it <b>very polar</b>. They hydrogen-bond to polar solutes and form dipole attractions with them.<br>
+        <b>Mobile phase:</b> a <b>non-polar</b> solvent (hexane, or hexane with a little acetone) that rises up the plate by capillary action.</p>${common}${rfEq}
+        <ul>
+          <li><b>Non-polar components</b>, such as &beta;-carotene (a hydrocarbon), are attracted to the mobile phase by London forces and have little attraction to the silica, so they have a <b>high R<sub>f</sub></b>.</li>
+          <li><b>Polar components</b>, such as the chlorophylls and lutein (C=O and O–H groups), adsorb strongly to the silica, so they have a <b>low R<sub>f</sub></b>.</li>
+          <li><b>Hexane only</b> is so non-polar that only &beta;-carotene moves far. Adding acetone makes the mobile phase slightly more polar, so it can compete with the silica and carry the polar pigments farther.</li>
+          <li><b>Ionic food dyes</b> (Mixtures A and B) are far too polar for a non-polar mobile phase and stay near the origin.</li>
+        </ul>
+        <p class="note">Compared with paper, TLC is faster and gives sharper, smaller spots. R<sub>f</sub> values depend on the stationary phase, the mobile-phase composition and the temperature, so compare them only under identical conditions. Pigment R<sub>f</sub> values here are typical, illustrative values for silica gel.</p>`;
+    }
+  }
+  function recompute(block){
+    const dS = parseFloat(block.querySelector('.dsolv').value);
+    block.querySelectorAll('.rows tr').forEach(tr => {
+      const d = parseFloat(tr.querySelector('.ds').value);
+      tr.querySelector('.rf').textContent = (dS > 0 && d >= 0) ? (d / dS).toFixed(2) : '–';
+    });
+  }
+  ['input', 'change'].forEach(ev => tablesEl.addEventListener(ev, e => {
+    const block = e.target.closest('.rfblock');
+    if (block) recompute(block);
+  }));
+  tablesEl.addEventListener('click', e => {
+    const btn = e.target.closest('.btnCheck');
+    if (!btn) return;
+    const block = btn.closest('.rfblock'), key = block.dataset.key;
+    const msg = block.querySelector('.checkMsg');
+    // which run's data does this table belong to?
+    let result = null;
+    if (key === 'current'){ if (S.done) result = { spots: S.lab.spots, dS: labFrontPx() / PX }; }
+    else result = S.lab.results[key] || null;
+    if (!result){
+      msg.textContent = key === 'current' ? 'Run the chromatogram to completion first.'
+        : 'Run the chromatogram with this mobile phase first (select it under Mobile Phase).';
+      return;
+    }
+    const dS = parseFloat(block.querySelector('.dsolv').value);
+    const trueDS = result.dS;
+    let correct = 0, attempted = 0;
+    block.querySelectorAll('.rows tr').forEach(tr => {
+      const col = tr.querySelector('.col').value;
+      const d = parseFloat(tr.querySelector('.ds').value);
+      const out = tr.querySelector('.chk');
+      if (!col || !(d >= 0) || !(dS > 0)){ out.textContent = ''; return; }
+      attempted++;
+      const spot = result.spots.find(s => s.id === col);
+      const ok = spot && Math.abs(d / dS - spot.rf) <= 0.03;
+      out.innerHTML = ok ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+      if (ok) correct++;
+    });
+    let note = attempted ? `${correct}/${attempted} within ±0.03 of the accepted value.` : 'Enter d_solvent, then choose a substance and enter d_solute for each spot.';
+    if (dS > 0 && Math.abs(dS - trueDS) > 0.15) note += ' Re-check d_solvent: align 0 with the origin, not the paper edge.';
+    msg.textContent = note;
+  });
+
+  // ---------- Start ----------
+  setMode('lab');
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
